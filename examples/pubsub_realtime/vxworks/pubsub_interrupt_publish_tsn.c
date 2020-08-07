@@ -61,7 +61,6 @@ static char *streamName = NULL;
 static uint32_t stackIndex = 0;
 static UA_Double pubInterval = 0;
 
-
 static UA_UInt64 ieee1588TimeGet() {
     struct timespec ts;
     (void)tsnClockTimeGet(tsnClockId, &ts);
@@ -72,10 +71,9 @@ static UA_UInt64 ieee1588TimeGet() {
 static void
 publishInterrupt(_Vx_usr_arg_t arg) {
     cycleTriggerTime = ieee1588TimeGet();
-    if(running)
-        {
+    if(running) {
         (void)semGive(msgSendSem);
-        }
+    }
 }
 
 /**
@@ -94,11 +92,13 @@ initTsnTimer(uint32_t period) {
     cid = tsnClockIdGet(ethName, ethUnit, TSN_TIMER_NO);
     if(cid != 0) {
         tickRate = NS_PER_SEC / period;
-        if((tsnTimerAllocate(cid) == ERROR) ||
-           (tsnClockConnect(cid, (FUNCPTR)publishInterrupt, NULL) == ERROR) ||
+        if(tsnTimerAllocate(cid) == ERROR) {
+            return 0;
+        }
+        if((tsnClockConnect(cid, (FUNCPTR)publishInterrupt, NULL) == ERROR) ||
            (tsnClockRateSet(cid, tickRate) == ERROR)) {
             (void)tsnTimerRelease(cid);
-            cid = 0;
+            return 0;
         }
     }
 
@@ -117,7 +117,8 @@ initTsnTimer(uint32_t period) {
 UA_StatusCode
 UA_PubSubManager_addRepeatedCallback(UA_Server *server,
                                      UA_ServerCallback callback,
-                                     void *data, UA_Double interval_ms,
+                                     void *data,
+                                     UA_Double interval_ms,
                                      UA_UInt64 *callbackId) {
     if(pubCallback) {
         UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
@@ -142,6 +143,8 @@ UA_PubSubManager_addRepeatedCallback(UA_Server *server,
 
     if(tsnClockEnable (tsnClockId, NULL) == ERROR) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Can't enable a TSN timer");
+        (void)tsnTimerRelease(tsnClockId);
+        tsnClockId = 0;
         return UA_STATUSCODE_BADINTERNALERROR;
     }
 
@@ -162,13 +165,16 @@ UA_PubSubManager_changeRepeatedCallbackInterval(UA_Server *server,
 
 void
 UA_PubSubManager_removeRepeatedPubSubCallback(UA_Server *server, UA_UInt64 callbackId) {
-    if(!pubCallback)
+    if(!pubCallback) {
         return;
+    }
 
     /* It is safe to disable and release the timer first, then clear callback */
-    (void)tsnClockDisable(tsnClockId);
-    (void)tsnTimerRelease(tsnClockId);
-    tsnClockId = 0;
+    if(tsnClockId != 0) {
+        (void)tsnClockDisable(tsnClockId);
+        (void)tsnTimerRelease(tsnClockId);
+        tsnClockId = 0;
+    }
 
     pubCallback = NULL;
     pubServer = NULL;
@@ -338,10 +344,10 @@ addServerNodes(UA_Server* server) {
                               publisherAttr, NULL, NULL);
 }
 
-static void open62541EthTSNTask (void) {
+static void open62541EthTSNTask(void) {
     uint64_t t = 0;
-    while (running) {
-        (void) semTake (msgSendSem, WAIT_FOREVER);
+    while(running) {
+        (void) semTake(msgSendSem, WAIT_FOREVER);
         t = ieee1588TimeGet();
         /* useMembufAlloc(); */
 
@@ -374,7 +380,7 @@ static void open62541EthTSNTask (void) {
     }
 }
 
-static void open62541ServerTask (void) {
+static void open62541ServerTask(void) {
     UA_Server *server = UA_Server_new();
     if(server == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Can't allocate a server object");
@@ -454,8 +460,8 @@ static bool initTSNTask() {
 }
 
 static bool initServerTask() {
-    serverTask = taskSpawn ((char *)"tPubServer", TSN_TASK_PRIO + 5, 0, TSN_TASK_STACKSZ*2, (FUNCPTR)open62541ServerTask,
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    serverTask = taskSpawn((char *)"tPubServer", TSN_TASK_PRIO + 5, 0, TSN_TASK_STACKSZ*2, (FUNCPTR)open62541ServerTask,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     if(serverTask == TASK_ID_ERROR) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Can't spawn a server task");
         return false;
@@ -463,13 +469,13 @@ static bool initServerTask() {
 
     /* Reroute TSN task to a specific CPU core */
 #ifdef _WRS_CONFIG_SMP
-    unsigned int ncpus = vxCpuConfiguredGet ();
+    unsigned int ncpus = vxCpuConfiguredGet();
     cpuset_t cpus;
 
     if(stackIndex < ncpus) {
-        CPUSET_ZERO (cpus);
-        CPUSET_SET (cpus, stackIndex);
-        if(taskCpuAffinitySet (serverTask, cpus) != OK) {
+        CPUSET_ZERO(cpus);
+        CPUSET_SET(cpus, stackIndex);
+        if(taskCpuAffinitySet(serverTask, cpus) != OK) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Can't move TSN task to core %d", stackIndex);
             return false;
         }
@@ -534,7 +540,7 @@ STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t st
     }
 
     /* Create a binary semaphore which is used by the TSN timer to wake up the sender task */
-    msgSendSem = semBCreate (SEM_Q_FIFO, SEM_EMPTY);
+    msgSendSem = semBCreate(SEM_Q_FIFO, SEM_EMPTY);
     if(msgSendSem == SEM_ID_NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Can't create a semaphore");
         goto startCleanup;
@@ -547,7 +553,7 @@ STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t st
     if(!initServerTask()) {
         goto startCleanup;
     }
-    
+
 
     return OK;
 startCleanup:

@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
  *   Copyright 2018 (c) Kontron Europe GmbH (Author: Rudolf Hoyler)
- *   Copyright 2019 (c) Wind River Systems, Inc.
+ *   Copyright 2019-2020 (c) Wind River Systems, Inc.
  */
 
 #include <open62541/plugin/log_stdout.h>
@@ -156,6 +156,38 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
         UA_free(newChannel);
         return NULL;
     }
+
+#ifdef UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
+    if(UA_String_equal(&(connectionConfig->tsnConfiguration.streamName), &UA_STRING_NULL)) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+            "PubSub connection creation failed. Invalid stream name.");
+        UA_close(sockFd);
+        UA_free(channelDataEthernet);
+        UA_free(newChannel);
+        return NULL;
+    }
+    if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_QBV,
+                     connectionConfig->tsnConfiguration.streamName.data,
+                     TSN_STREAMNAMSIZ) < 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+            "PubSub connection creation failed. Cannot set stream name.");
+        UA_close(sockFd);
+        UA_free(channelDataEthernet);
+        UA_free(newChannel);
+        return NULL;
+    }
+
+    if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_STACK_IDX,
+                     &(connectionConfig->tsnConfiguration.stackIdx),
+                     sizeof(connectionConfig->tsnConfiguration.stackIdx)) < 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+            "PubSub connection creation failed. Cannot set stack index.");
+        UA_close(sockFd);
+        UA_free(channelDataEthernet);
+        UA_free(newChannel);
+        return NULL;
+    }
+#endif
 
     /* get interface index */
     struct ifreq ifreq;

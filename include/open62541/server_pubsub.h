@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
  * Copyright (c) 2019 Kalycito Infotech Private Limited
+ * Copyright (c) 2020 Wind River Systems, Inc.
  */
 
 #ifndef UA_SERVER_PUBSUB_H
@@ -147,7 +148,7 @@ typedef struct {
 #endif
 #ifdef UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
     /* TSN related connection configuration - Not in PubSub specification */
-    UA_TSNConfiguration tsnConfiguration; 
+    UA_TSNConfiguration tsnConfiguration;
 #endif
 } UA_PubSubConnectionConfig;
 
