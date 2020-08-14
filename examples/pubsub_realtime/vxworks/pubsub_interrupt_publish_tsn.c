@@ -219,6 +219,13 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.promotedField = UA_FALSE;
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = seqNumNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+
+    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
+    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
+    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
+                         &sequenceNumber, &UA_TYPES[UA_TYPES_UINT32]);
+    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f4);
 
     UA_NodeId f3;
@@ -228,6 +235,13 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.promotedField = UA_FALSE;
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = cycleTriggerTimeNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+
+    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
+    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
+    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
+                         &lastCycleTriggerTime, &UA_TYPES[UA_TYPES_UINT64]);
+    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f3);
 
     UA_NodeId f2;
@@ -237,6 +251,13 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.promotedField = UA_FALSE;
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = taskBeginTimeNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+
+    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
+    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
+    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
+                         &lastTaskBeginTime, &UA_TYPES[UA_TYPES_UINT64]);
+    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f2);
 
 
@@ -247,6 +268,13 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.promotedField = UA_FALSE;
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = taskEndTimeNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
+
+    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
+    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
+    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
+                         &lastTaskEndTime, &UA_TYPES[UA_TYPES_UINT64]);
+    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f1);
 
     UA_WriterGroupConfig writerGroupConfig;
@@ -255,7 +283,7 @@ addPubSubConfiguration(UA_Server* server) {
     writerGroupConfig.publishingInterval = pubInterval;
     writerGroupConfig.enabled = UA_FALSE;
     writerGroupConfig.encodingMimeType = UA_PUBSUB_ENCODING_UADP;
-    writerGroupConfig.rtLevel = UA_PUBSUB_RT_NONE;
+    writerGroupConfig.rtLevel = UA_PUBSUB_RT_FIXED_SIZE;
     UA_Server_addWriterGroup(server, connectionIdent,
                              &writerGroupConfig, &writerGroupIdent);
 
@@ -349,30 +377,20 @@ static void open62541EthTSNTask(void) {
     while(running) {
         (void) semTake(msgSendSem, WAIT_FOREVER);
         t = ieee1588TimeGet();
-        /* useMembufAlloc(); */
+        useMembufAlloc();
 
         /*
          * Because we can't get the task end time of one packet before it is
          * sent, we let one packet take its previous packet's cycleTriggerTime,
          * taskBeginTime and taskEndTime.
          */
-        UA_Variant tmpVar;
-        UA_Variant_init(&tmpVar);
-        UA_Variant_setScalar(&tmpVar, &sequenceNumber, &UA_TYPES[UA_TYPES_UINT32]);
-        UA_Server_writeValue(pubServer, seqNumNodeId, tmpVar);
-        if(sequenceNumber != 0) {
-            UA_Variant_init(&tmpVar);
-            UA_Variant_setScalar(&tmpVar, &lastCycleTriggerTime, &UA_TYPES[UA_TYPES_UINT64]);
-            UA_Server_writeValue(pubServer, cycleTriggerTimeNodeId, tmpVar);
-            UA_Variant_init(&tmpVar);
-            UA_Variant_setScalar(&tmpVar, &lastTaskBeginTime, &UA_TYPES[UA_TYPES_UINT64]);
-            UA_Server_writeValue(pubServer, taskBeginTimeNodeId, tmpVar);
-            UA_Variant_init(&tmpVar);
-            UA_Variant_setScalar(&tmpVar, &lastTaskEndTime, &UA_TYPES[UA_TYPES_UINT64]);
-            UA_Server_writeValue(pubServer, taskEndTimeNodeId, tmpVar);
-            pubCallback(pubServer, pubData);
+        if(sequenceNumber == 0) {
+            lastCycleTriggerTime = 0;
+            lastTaskBeginTime = 0;
+            lastTaskEndTime = 0;
         }
-        /* useNormalAlloc(); */
+        pubCallback(pubServer, pubData);
+        useNormalAlloc();
         sequenceNumber++;
         lastCycleTriggerTime = cycleTriggerTime;
         lastTaskBeginTime = t;
