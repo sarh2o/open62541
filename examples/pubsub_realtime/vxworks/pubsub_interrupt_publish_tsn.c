@@ -169,6 +169,13 @@ UA_PubSubManager_removeRepeatedPubSubCallback(UA_Server *server, UA_UInt64 callb
         return;
     }
 
+    /* Before release timer resource, wait for TSN task stopping first. */
+    (void) semGive(msgSendSem);
+    if(tsnTask != TASK_ID_NULL) {
+        (void) taskWait(tsnTask, WAIT_FOREVER);
+        tsnTask = TASK_ID_NULL;
+    }
+
     /* It is safe to disable and release the timer first, then clear callback */
     if(tsnClockId != 0) {
         (void)tsnClockDisable(tsnClockId);
@@ -376,6 +383,9 @@ static void open62541EthTSNTask(void) {
     uint64_t t = 0;
     while(running) {
         (void) semTake(msgSendSem, WAIT_FOREVER);
+        if(!running) {
+            break;
+        }
         t = ieee1588TimeGet();
         useMembufAlloc();
 
@@ -420,13 +430,6 @@ static void open62541ServerTask(void) {
 
     /* Run the server */
     (void) UA_Server_run(server, &running);
-
-    /* Before release server resource, wait for TSN task stopping first. */
-    (void) semGive(msgSendSem);
-    if(tsnTask != TASK_ID_NULL) {
-        (void) taskWait(tsnTask, WAIT_FOREVER);
-        tsnTask = TASK_ID_NULL;
-    }
 
 serverCleanup:
     if(server != NULL) {

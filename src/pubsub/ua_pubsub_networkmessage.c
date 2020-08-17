@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2017 - 2018 Fraunhofer IOSB (Author: Tino Bischoff)
  * Copyright (c) 2019 Fraunhofer IOSB (Author: Andreas Ebner)
+ * Copyright (c) 2020 Wind River Systems, Inc.
  */
 
 #include <open62541/types_generated_encoding_binary.h>
@@ -1348,6 +1349,7 @@ UA_DataSetMessage_calcSizeBinary(UA_DataSetMessage* p, UA_NetworkMessageOffsetBu
                     UA_Variant_setScalar(&offsetBuffer->offsets[pos].offsetData.value.value->value,
                                          p->data.keyFrameData.dataSetFields[i].value.data,
                                          p->data.keyFrameData.dataSetFields[i].value.type);
+                    offsetBuffer->offsets[pos].offsetData.value.value->value.storageType = p->data.keyFrameData.dataSetFields[i].value.storageType;
                     //offsetBuffer->offsets[pos].offsetData.value.value->value = p->data.keyFrameData.dataSetFields->value;
                 }
                 size += UA_calcSizeBinary(&p->data.keyFrameData.dataSetFields[i].value, &UA_TYPES[UA_TYPES_VARIANT]);
