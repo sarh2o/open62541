@@ -166,6 +166,8 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
         UA_free(newChannel);
         return NULL;
     }
+
+    /* Bind the PubSub packet socket to a TSN stream */
     if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_QBV,
                      connectionConfig->tsnConfiguration.streamName.data,
                      TSN_STREAMNAMSIZ) < 0) {
@@ -177,9 +179,10 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
         return NULL;
     }
 
-    if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_STACK_IDX,
-                     &(connectionConfig->tsnConfiguration.stackIdx),
-                     sizeof(connectionConfig->tsnConfiguration.stackIdx)) < 0) {
+    /* Bind the PubSub packet socket to a specific network stack instance */
+    if((connectionConfig->tsnConfiguration.stackIdx > 0)
+       && (UA_setsockopt(sockFd, SOL_SOCKET, SO_X_STACK_IDX, &(connectionConfig->tsnConfiguration.stackIdx),
+                         sizeof(connectionConfig->tsnConfiguration.stackIdx)) < 0)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
             "PubSub connection creation failed. Cannot set stack index.");
         UA_close(sockFd);
