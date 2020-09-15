@@ -176,25 +176,22 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
         }
     }
     if(sName == NULL || UA_String_equal(sName, &UA_STRING_NULL) || (sName->length >= TSN_STREAMNAMSIZ)) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-            "PubSub connection creation failed. Invalid stream name.");
-        UA_close(sockFd);
-        UA_free(channelDataEthernet);
-        UA_free(newChannel);
-        return NULL;
-    }
+        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+            "Invalid stream name. No TSN stream associated.");
 
-    /* Bind the PubSub packet socket to a TSN stream */
-    char sNameStr[TSN_STREAMNAMSIZ];
-    memcpy(sNameStr, sName->data, sName->length);
-    sNameStr[sName->length] = '\0';
-    if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_QBV, sNameStr, TSN_STREAMNAMSIZ) < 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-            "PubSub connection creation failed. Cannot set stream name: %s.", sName->data);
-        UA_close(sockFd);
-        UA_free(channelDataEthernet);
-        UA_free(newChannel);
-        return NULL;
+    } else {
+        /* Bind the PubSub packet socket to a TSN stream */
+        char sNameStr[TSN_STREAMNAMSIZ];
+        memcpy(sNameStr, sName->data, sName->length);
+        sNameStr[sName->length] = '\0';
+        if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_QBV, sNameStr, TSN_STREAMNAMSIZ) < 0) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                "PubSub connection creation failed. Cannot set stream name: %s.", sNameStr);
+            UA_close(sockFd);
+            UA_free(channelDataEthernet);
+            UA_free(newChannel);
+            return NULL;
+        }
     }
 
     /* Bind the PubSub packet socket to a specific network stack instance */
