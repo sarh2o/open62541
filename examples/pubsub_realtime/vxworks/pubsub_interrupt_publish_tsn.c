@@ -47,7 +47,7 @@ static UA_Boolean running = true;
 static void *pubData;
 static TASK_ID tsnTask = TASK_ID_NULL;
 static TASK_ID serverTask = TASK_ID_NULL;
-static TSN_STREAM_CFG * streamCfg = NULL;
+static TSN_STREAM_CFG *streamCfg = NULL;
 
 /* The value to published */
 static UA_UInt32 sequenceNumber = 0;
@@ -55,6 +55,10 @@ static UA_UInt64 cycleTriggerTime = 0;
 static UA_UInt64 lastCycleTriggerTime = 0;
 static UA_UInt64 lastTaskBeginTime = 0;
 static UA_UInt64 lastTaskEndTime = 0;
+static UA_DataValue *staticValueSeqNum = NULL;
+static UA_DataValue *staticValueCycTrig = NULL;
+static UA_DataValue *staticValueCycBegin = NULL;
+static UA_DataValue *staticValueCycEnd = NULL;
 static clockid_t tsnClockId = 0; /* TSN clock ID */
 static char *ethName = NULL;
 static int ethUnit = 0;
@@ -238,11 +242,11 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = seqNumNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
 
-    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
-    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
-    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
-                         &sequenceNumber, &UA_TYPES[UA_TYPES_UINT32]);
-    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.rtFieldSourceEnabled = UA_TRUE;
+    staticValueSeqNum = UA_DataValue_new();
+    UA_Variant_setScalar(&staticValueSeqNum->value, &sequenceNumber, &UA_TYPES[UA_TYPES_UINT32]);
+    staticValueSeqNum->value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.staticValueSource = &staticValueSeqNum;
 
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f4);
 
@@ -254,11 +258,11 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = cycleTriggerTimeNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
 
-    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
-    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
-    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
-                         &lastCycleTriggerTime, &UA_TYPES[UA_TYPES_UINT64]);
-    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.rtFieldSourceEnabled = UA_TRUE;
+    staticValueCycTrig = UA_DataValue_new();
+    UA_Variant_setScalar(&staticValueCycTrig->value, &lastCycleTriggerTime, &UA_TYPES[UA_TYPES_UINT64]);
+    staticValueCycTrig->value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.staticValueSource = &staticValueCycTrig;
 
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f3);
 
@@ -270,11 +274,11 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = taskBeginTimeNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
 
-    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
-    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
-    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
-                         &lastTaskBeginTime, &UA_TYPES[UA_TYPES_UINT64]);
-    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.rtFieldSourceEnabled = UA_TRUE;
+    staticValueCycBegin = UA_DataValue_new();
+    UA_Variant_setScalar(&staticValueCycBegin->value, &lastTaskBeginTime, &UA_TYPES[UA_TYPES_UINT64]);
+    staticValueCycBegin->value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.staticValueSource = &staticValueCycBegin;
 
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f2);
 
@@ -287,11 +291,11 @@ addPubSubConfiguration(UA_Server* server) {
     dataSetFieldCfg.field.variable.publishParameters.publishedVariable = taskEndTimeNodeId;
     dataSetFieldCfg.field.variable.publishParameters.attributeId = UA_ATTRIBUTEID_VALUE;
 
-    dataSetFieldCfg.field.variable.staticValueSourceEnabled = true;
-    UA_DataValue_init(&dataSetFieldCfg.field.variable.staticValueSource);
-    UA_Variant_setScalar(&dataSetFieldCfg.field.variable.staticValueSource.value,
-                         &lastTaskEndTime, &UA_TYPES[UA_TYPES_UINT64]);
-    dataSetFieldCfg.field.variable.staticValueSource.value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.rtFieldSourceEnabled = UA_TRUE;
+    staticValueCycEnd = UA_DataValue_new();
+    UA_Variant_setScalar(&staticValueCycEnd->value, &lastTaskEndTime, &UA_TYPES[UA_TYPES_UINT64]);
+    staticValueCycEnd->value.storageType = UA_VARIANT_DATA_NODELETE;
+    dataSetFieldCfg.field.variable.rtValueSource.staticValueSource = &staticValueCycEnd;
 
     UA_Server_addDataSetField(server, publishedDataSetIdent, &dataSetFieldCfg, &f1);
 
@@ -540,6 +544,22 @@ void open62541PubTSNStop() {
     pubInterval = 0;
     streamCfg = NULL;
 
+    if(staticValueSeqNum != NULL) {
+        UA_DataValue_delete(staticValueSeqNum);
+        staticValueSeqNum = NULL;
+    }
+    if(staticValueCycTrig != NULL) {
+        UA_DataValue_delete(staticValueCycTrig);
+        staticValueCycTrig = NULL;
+    }
+    if(staticValueCycBegin != NULL) {
+        UA_DataValue_delete(staticValueCycBegin);
+        staticValueCycBegin = NULL;
+    }
+    if(staticValueCycEnd != NULL) {
+        UA_DataValue_delete(staticValueCycEnd);
+        staticValueCycEnd = NULL;
+    }
     sequenceNumber = 0;
     cycleTriggerTime = 0;
     lastCycleTriggerTime = 0;
