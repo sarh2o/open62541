@@ -158,7 +158,24 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
     }
 
 #ifdef UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
-    if(UA_String_equal(&(connectionConfig->tsnConfiguration.streamName), &UA_STRING_NULL)) {
+    size_t i = 0;
+    UA_String streamName = UA_STRING("streamName");
+    UA_String stackIdx = UA_STRING("stackIdx");
+    UA_String * sName = NULL;
+    UA_UInt32 stkIdx = 0;
+    for(i = 0; i < connectionConfig->connectionPropertiesSize; i++) {
+        if(UA_String_equal(&connectionConfig->connectionProperties[i].key.name, &streamName)) {
+            if(UA_Variant_hasScalarType(&connectionConfig->connectionProperties[i].value, &UA_TYPES[UA_TYPES_STRING])) {
+                sName = (UA_String *)connectionConfig->connectionProperties[i].value.data;
+            }
+        }
+        else if(UA_String_equal(&connectionConfig->connectionProperties[i].key.name, &stackIdx)) {
+            if(UA_Variant_hasScalarType(&connectionConfig->connectionProperties[i].value, &UA_TYPES[UA_TYPES_UINT32])) {
+                stkIdx = *(UA_UInt32 *) connectionConfig->connectionProperties[i].value.data;
+            }
+        }
+    }
+    if(sName == NULL || UA_String_equal(sName, &UA_STRING_NULL) || (sName->length >= TSN_STREAMNAMSIZ)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
             "PubSub connection creation failed. Invalid stream name.");
         UA_close(sockFd);
@@ -168,11 +185,12 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
     }
 
     /* Bind the PubSub packet socket to a TSN stream */
-    if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_QBV,
-                     connectionConfig->tsnConfiguration.streamName.data,
-                     TSN_STREAMNAMSIZ) < 0) {
+    char sNameStr[TSN_STREAMNAMSIZ];
+    memcpy(sNameStr, sName->data, sName->length);
+    sNameStr[sName->length] = '\0';
+    if(UA_setsockopt(sockFd, SOL_SOCKET, SO_X_QBV, sNameStr, TSN_STREAMNAMSIZ) < 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-            "PubSub connection creation failed. Cannot set stream name.");
+            "PubSub connection creation failed. Cannot set stream name: %s.", sName->data);
         UA_close(sockFd);
         UA_free(channelDataEthernet);
         UA_free(newChannel);
@@ -180,9 +198,7 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
     }
 
     /* Bind the PubSub packet socket to a specific network stack instance */
-    if((connectionConfig->tsnConfiguration.stackIdx > 0)
-       && (UA_setsockopt(sockFd, SOL_SOCKET, SO_X_STACK_IDX, &(connectionConfig->tsnConfiguration.stackIdx),
-                         sizeof(connectionConfig->tsnConfiguration.stackIdx)) < 0)) {
+    if((stkIdx > 0) && (UA_setsockopt(sockFd, SOL_SOCKET, SO_X_STACK_IDX, &stkIdx, sizeof(stkIdx)) < 0)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
             "PubSub connection creation failed. Cannot set stack index.");
         UA_close(sockFd);

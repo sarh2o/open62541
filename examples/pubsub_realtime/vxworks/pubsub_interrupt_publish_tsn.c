@@ -34,6 +34,9 @@
 #define TSN_TASK_PRIO           30
 #define TSN_TASK_STACKSZ        8192
 
+#define KEY_STREAM_NAME         "streamName"
+#define KEY_STACK_IDX           "stackIdx"
+
 static UA_NodeId seqNumNodeId;
 static UA_NodeId cycleTriggerTimeNodeId;
 static UA_NodeId taskBeginTimeNodeId;
@@ -57,7 +60,7 @@ static char *ethName = NULL;
 static int ethUnit = 0;
 static char ethInterface[END_NAME_MAX];
 static SEM_ID msgSendSem = SEM_ID_NULL;
-static char *streamName = NULL;
+static UA_String streamName = {0, NULL};
 static uint32_t stackIndex = 0;
 static UA_Double pubInterval = 0;
 
@@ -206,8 +209,16 @@ addPubSubConfiguration(UA_Server* server) {
                          &UA_TYPES[UA_TYPES_NETWORKADDRESSURLDATATYPE]);
     connectionConfig.publisherId.numeric = UA_UInt32_random();
 #ifdef _WRS_CONFIG_OPEN62541_UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
-    connectionConfig.tsnConfiguration.streamName = UA_STRING(streamName);
-    connectionConfig.tsnConfiguration.stackIdx = stackIndex;
+    UA_KeyValuePair connectionOptions[2];
+
+    connectionOptions[0].key = UA_QUALIFIEDNAME(0, KEY_STREAM_NAME);
+    UA_Variant_setScalar(&connectionOptions[0].value, &streamName, &UA_TYPES[UA_TYPES_STRING]);
+
+    connectionOptions[1].key = UA_QUALIFIEDNAME(0, KEY_STACK_IDX);
+    UA_Variant_setScalar(&connectionOptions[1].value, &stackIndex, &UA_TYPES[UA_TYPES_UINT32]);
+
+    connectionConfig.connectionPropertiesSize = 2;
+    connectionConfig.connectionProperties = connectionOptions;
 #endif
     UA_Server_addPubSubConnection(server, &connectionConfig, &connectionIdent);
 
@@ -449,7 +460,7 @@ static bool initTSNStream(char *eName, size_t eNameSize, int unit) {
         return false;
     }
     else {
-        streamName = streamCfg->streamObjs[0].stream.name;
+        streamName = UA_STRING(streamCfg->streamObjs[0].stream.name);
     }
     pubInterval = (UA_Double)((streamCfg->schedule.cycleTime * 1.0) / NS_PER_MS);
     return true;
@@ -524,7 +535,7 @@ void open62541PubTSNStop() {
 
     ethName = NULL;
     ethUnit = 0;
-    streamName = NULL;
+    streamName = UA_STRING_NULL;
     stackIndex = 0;
     pubInterval = 0;
     streamCfg = NULL;

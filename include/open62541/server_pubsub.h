@@ -4,7 +4,6 @@
  *
  * Copyright (c) 2017-2018 Fraunhofer IOSB (Author: Andreas Ebner)
  * Copyright (c) 2019 Kalycito Infotech Private Limited
- * Copyright (c) 2020 Wind River Systems, Inc.
  */
 
 #ifndef UA_SERVER_PUBSUB_H
@@ -118,13 +117,6 @@ typedef struct {
 } UA_ETFConfiguration;
 #endif
 
-#ifdef UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
-typedef struct {
-    UA_String streamName;
-    UA_Int32 stackIdx;
-} UA_TSNConfiguration;
-#endif
-
 typedef struct {
     UA_String name;
     UA_Boolean enabled;
@@ -145,10 +137,6 @@ typedef struct {
 #ifdef UA_ENABLE_PUBSUB_ETH_UADP_ETF
     /* ETF related connection configuration - Not in PubSub specfication */
     UA_ETFConfiguration etfConfiguration;
-#endif
-#ifdef UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
-    /* TSN related connection configuration - Not in PubSub specification */
-    UA_TSNConfiguration tsnConfiguration;
 #endif
 } UA_PubSubConnectionConfig;
 
