@@ -157,7 +157,7 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
         return NULL;
     }
 
-#ifdef UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
+#ifdef UA_ARCHITECTURE_VXWORKS
     size_t i = 0;
     UA_String streamName = UA_STRING("streamName");
     UA_String stackIdx = UA_STRING("stackIdx");
@@ -175,11 +175,7 @@ UA_PubSubChannelEthernet_open(const UA_PubSubConnectionConfig *connectionConfig)
             }
         }
     }
-    if(sName == NULL || UA_String_equal(sName, &UA_STRING_NULL) || (sName->length >= TSN_STREAMNAMSIZ)) {
-        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
-            "Invalid stream name. No TSN stream associated.");
-
-    } else {
+    if((sName != NULL) && !UA_String_equal(sName, &UA_STRING_NULL) && (sName->length < TSN_STREAMNAMSIZ)) {
         /* Bind the PubSub packet socket to a TSN stream */
         char sNameStr[TSN_STREAMNAMSIZ];
         memcpy(sNameStr, sName->data, sName->length);

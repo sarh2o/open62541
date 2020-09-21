@@ -212,18 +212,23 @@ addPubSubConfiguration(UA_Server* server) {
     UA_Variant_setScalar(&connectionConfig.address, &networkAddressUrl,
                          &UA_TYPES[UA_TYPES_NETWORKADDRESSURLDATATYPE]);
     connectionConfig.publisherId.numeric = UA_UInt32_random();
-#ifdef _WRS_CONFIG_OPEN62541_UA_ENABLE_PUBSUB_ETH_UADP_VXWORKS_TSN
+
     UA_KeyValuePair connectionOptions[2];
 
     connectionOptions[0].key = UA_QUALIFIEDNAME(0, KEY_STREAM_NAME);
-    UA_Variant_setScalar(&connectionOptions[0].value, &streamName, &UA_TYPES[UA_TYPES_STRING]);
+    if (stackIndex == 0) {
+        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "No TSN stream associated.");
+        UA_Variant_setScalar(&connectionOptions[0].value, &UA_STRING_NULL, &UA_TYPES[UA_TYPES_STRING]);
+    } else {
+        UA_Variant_setScalar(&connectionOptions[0].value, &streamName, &UA_TYPES[UA_TYPES_STRING]);
+    }
 
     connectionOptions[1].key = UA_QUALIFIEDNAME(0, KEY_STACK_IDX);
     UA_Variant_setScalar(&connectionOptions[1].value, &stackIndex, &UA_TYPES[UA_TYPES_UINT32]);
 
     connectionConfig.connectionPropertiesSize = 2;
     connectionConfig.connectionProperties = connectionOptions;
-#endif
+
     UA_Server_addPubSubConnection(server, &connectionConfig, &connectionIdent);
 
     UA_PublishedDataSetConfig publishedDataSetConfig;
