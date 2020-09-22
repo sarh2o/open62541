@@ -67,6 +67,7 @@ static SEM_ID msgSendSem = SEM_ID_NULL;
 static UA_String streamName = {0, NULL};
 static uint32_t stackIndex = 0;
 static UA_Double pubInterval = 0;
+static bool withTSN = false;
 
 static UA_UInt64 ieee1588TimeGet() {
     struct timespec ts;
@@ -216,13 +217,7 @@ addPubSubConfiguration(UA_Server* server) {
     UA_KeyValuePair connectionOptions[2];
 
     connectionOptions[0].key = UA_QUALIFIEDNAME(0, KEY_STREAM_NAME);
-    if (stackIndex == 0) {
-        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "No TSN stream associated.");
-        UA_Variant_setScalar(&connectionOptions[0].value, &UA_STRING_NULL, &UA_TYPES[UA_TYPES_STRING]);
-    } else {
-        UA_Variant_setScalar(&connectionOptions[0].value, &streamName, &UA_TYPES[UA_TYPES_STRING]);
-    }
-
+    UA_Variant_setScalar(&connectionOptions[0].value, &streamName, &UA_TYPES[UA_TYPES_STRING]);
     connectionOptions[1].key = UA_QUALIFIEDNAME(0, KEY_STACK_IDX);
     UA_Variant_setScalar(&connectionOptions[1].value, &stackIndex, &UA_TYPES[UA_TYPES_UINT32]);
 
@@ -469,7 +464,13 @@ static bool initTSNStream(char *eName, size_t eNameSize, int unit) {
         return false;
     }
     else {
-        streamName = UA_STRING(streamCfg->streamObjs[0].stream.name);
+        if(withTSN) {
+            streamName = UA_STRING(streamCfg->streamObjs[0].stream.name);
+        } else {
+            UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "No TSN stream associated.");
+            streamName = UA_STRING_NULL;
+        }
+
     }
     pubInterval = (UA_Double)((streamCfg->schedule.cycleTime * 1.0) / NS_PER_MS);
     return true;
@@ -546,6 +547,7 @@ void open62541PubTSNStop() {
     ethUnit = 0;
     streamName = UA_STRING_NULL;
     stackIndex = 0;
+    withTSN = false;
     pubInterval = 0;
     streamCfg = NULL;
 
@@ -573,15 +575,16 @@ void open62541PubTSNStop() {
 }
 
 /**
- * Create a publisher over TSN.
+ * Create a publisher with/without TSN.
  * eName: Ethernet interface name like "gei", "gem", etc
  * eNameSize: The length of eName including "\0"
  * unit: Unit NO of the ethernet interface
  * stkIdx: Network stack index
+ * withTsn: true: Enable TSN; false: Disable TSN
  *
  * @return OK on success, otherwise ERROR
  */
-STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t stkIdx) {
+STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t stkIdx, bool withTsn) {
     if((eName == NULL) || (eNameSize == 0)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Ethernet interface name is invalid");
         return ERROR;
@@ -590,6 +593,7 @@ STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t st
     ethName = eName;
     ethUnit = unit;
     stackIndex = stkIdx;
+    withTSN = withTsn;
     snprintf(ethInterface, sizeof(ethInterface), "%s%d", eName, unit);
 
     if(!initTSNStream(eName, eNameSize, unit)) {

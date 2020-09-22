@@ -21,15 +21,16 @@ This publisher provides 2 APIs to users:
 
    ```C
    /**
-    * Create a publisher over TSN.
+    * Create a publisher with/without TSN.
     * eName: Ethernet interface name like "gei", "gem", etc
     * eNameSize: The length of eName including "\0"
     * unit: Unit NO of the ethernet interface
     * stkIdx: Network stack index
+    * withTsn: true: Enable TSN; false: Disable TSN
     *
     * @return OK on success, otherwise ERROR
     */
-    STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t stkIdx);
+    STATUS open62541PubTSNStart(char *eName, size_t eNameSize, int unit, uint32_t stkIdx, bool withTsn);
    ```
 
    In order to get the best performance, this API supports to associate a dedicated CPU core with TSN related interrupt and tasks. The stkIdx argument is used for this purpose. Its value is the CPU core number: 0 means Core 0, 1 means Core 1, etc.
